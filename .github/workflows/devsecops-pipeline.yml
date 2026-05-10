@@ -1,6 +1,49 @@
 name: DevSecOps Pipeline
 
 on:
+  push: {}
+  pull_request: {}
+
+jobs:
+  devsecops:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.8'
+
+      - name: Install scanner tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install safety pytest
+
+      - name: Dependency vulnerability scan
+        run: |
+          pip install -r secure-app/requirements.txt
+          echo "Running safety vulnerability check"
+          safety check --file=secure-app/requirements.txt --full-report || true
+
+      - name: Run unit tests
+        working-directory: secure-app
+        run: |
+          pytest -q
+
+      - name: Build container
+        run: |
+          docker build -t demo/secure-app:latest secure-app
+
+      - name: Scan container for vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: demo/secure-app:latest
+        continue-on-error: true
+name: DevSecOps Pipeline
+
+on:
   push:
     branches:
       - main
